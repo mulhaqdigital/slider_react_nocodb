@@ -2,6 +2,44 @@
 <html>
   <head>
     <title>Card Slider with NocoDB</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      /* Hide scrollbar but keep functionality */
+      .hide-scrollbar {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;     /* Firefox */
+      }
+      .hide-scrollbar::-webkit-scrollbar {
+        display: none;             /* Chrome, Safari and Opera */
+      }
+
+      /* Responsive card width */
+      @media (max-width: 768px) {
+        .card {
+          min-width: 280px !important;
+          margin: 0 auto !important;
+        }
+        .nav-button {
+          display: none !important; /* Hide navigation buttons on mobile */
+        }
+        .card-container {
+          gap: 15px !important;
+          padding: 10px !important;
+        }
+      }
+
+      /* Loading skeleton animation */
+      @keyframes shimmer {
+        0% { background-position: -468px 0; }
+        100% { background-position: 468px 0; }
+      }
+      
+      .skeleton {
+        animation: shimmer 1s linear infinite;
+        background: linear-gradient(to right, #f6f7f8 8%, #edeef1 18%, #f6f7f8 33%);
+        background-size: 800px 104px;
+      }
+    </style>
   </head>
   <body>
     <div id="card"></div>
@@ -31,7 +69,7 @@
           });
           setImageError(true);
           setImageLoaded(true);
-          e.target.src = 'https://via.placeholder.com/230x230?text=No+Image';
+          e.target.src = 'https://via.placeholder.com/280x280?text=No+Image';
         };
 
         // Function to handle image load
@@ -54,32 +92,45 @@
             onClick={() => link ? window.open(link, "_blank") : null}
             style={{
               border: "2px solid #ddd",
-              borderRadius: "10px",
+              borderRadius: "15px",
               padding: "15px",
-              minWidth: "230px",
-              height: "400px",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+              minWidth: "280px",
+              height: "450px",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
               textAlign: "center",
               fontFamily: "Arial, sans-serif",
               background: "#fff",
-              scrollSnapAlign: "start",
+              scrollSnapAlign: "center",
               cursor: link ? "pointer" : "default",
               position: "relative",
-              overflow: "hidden"
-            }}>
+              overflow: "hidden",
+              transition: "transform 0.2s, box-shadow 0.2s",
+              margin: "0 5px",
+              WebkitTapHighlightColor: "transparent",
+              touchAction: "pan-x"
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-5px)";
+              e.currentTarget.style.boxShadow = "0 6px 16px rgba(0,0,0,0.15)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
+            }}
+          >
             <div style={{ 
               position: "relative", 
-              width: "230px", 
-              height: "230px",
+              width: "100%",
+              height: "280px",
               background: "#f0f0f0",
-              borderRadius: "5px",
+              borderRadius: "10px",
               overflow: "hidden",
               backgroundColor: "white"
             }}>
               {!imageLoaded && <div className="skeleton" style={{ width: "100%", height: "100%" }} />}
               {!imageError && (
                 <img 
-                  src={imageUrl || 'https://via.placeholder.com/230x230?text=No+Image'} 
+                  src={imageUrl || 'https://via.placeholder.com/280x280?text=No+Image'} 
                   alt={title || 'Card image'} 
                   onLoad={handleImageLoad}
                   onError={handleImageError}
@@ -111,21 +162,22 @@
             </div>
             <h3 style={{ 
               margin: "15px 0", 
-              fontSize: "18px",
-              lineHeight: "1.2",
-              height: "44px",
+              fontSize: "20px",
+              lineHeight: "1.3",
+              height: "52px",
               overflow: "hidden",
               display: "-webkit-box",
               WebkitLineClamp: "2",
-              WebkitBoxOrient: "vertical"
+              WebkitBoxOrient: "vertical",
+              color: "#333"
             }}>
               {title || 'Untitled'}
             </h3>
             <p style={{ 
               margin: "10px 0",
-              fontSize: "14px",
-              lineHeight: "1.4",
-              height: "60px",
+              fontSize: "16px",
+              lineHeight: "1.5",
+              height: "72px",
               overflow: "hidden",
               display: "-webkit-box",
               WebkitLineClamp: "3",
@@ -137,7 +189,7 @@
             <p style={{ 
               fontStyle: "italic", 
               color: "#888", 
-              fontSize: "12px",
+              fontSize: "14px",
               margin: "10px 0 0 0",
               position: "absolute",
               bottom: "15px",
@@ -161,6 +213,41 @@
         const [loading, setLoading] = React.useState(true);
         const [error, setError] = React.useState(null);
         const scrollRef = React.useRef(null);
+        const [isDragging, setIsDragging] = React.useState(false);
+        const [startX, setStartX] = React.useState(0);
+        const [scrollLeft, setScrollLeft] = React.useState(0);
+
+        // Touch and mouse event handlers for smooth scrolling
+        const handleMouseDown = (e) => {
+          setIsDragging(true);
+          setStartX(e.pageX - scrollRef.current.offsetLeft);
+          setScrollLeft(scrollRef.current.scrollLeft);
+        };
+
+        const handleMouseUp = () => {
+          setIsDragging(false);
+        };
+
+        const handleMouseMove = (e) => {
+          if (!isDragging) return;
+          e.preventDefault();
+          const x = e.pageX - scrollRef.current.offsetLeft;
+          const walk = (x - startX) * 2;
+          scrollRef.current.scrollLeft = scrollLeft - walk;
+        };
+
+        const handleTouchStart = (e) => {
+          setIsDragging(true);
+          setStartX(e.touches[0].pageX - scrollRef.current.offsetLeft);
+          setScrollLeft(scrollRef.current.scrollLeft);
+        };
+
+        const handleTouchMove = (e) => {
+          if (!isDragging) return;
+          const x = e.touches[0].pageX - scrollRef.current.offsetLeft;
+          const walk = (x - startX) * 2;
+          scrollRef.current.scrollLeft = scrollLeft - walk;
+        };
 
         React.useEffect(() => {
           // Fetch data from NocoDB public API
@@ -172,7 +259,7 @@
                 'https://app.nocodb.com/api/v2/tables/msvdzpdvnlr06r0/records',
                 {
                   headers: {
-                    'xc-token': 'lYRPLV022asQhcc8_rWP9K8iyA9fuDhSzTidAVF3'  // Restored original token
+                    'xc-token': 'lYRPLV022asQhcc8_rWP9K8iyA9fuDhSzTidAVF3'
                   },
                   params: {
                     offset: 0,
@@ -181,57 +268,24 @@
                   }
                 }
               );
-              console.log('API Response:', response.data); // Debug log
-              // Get the raw data from NocoDB API response
               const cardData = response.data?.list || response.data || [];
-              
-              // Transform each card's data to match our component structure
-              const mappedCards = cardData.map(card => {
-                // Step 1: Get the image URL directly from the imageurl column
-                // Using the exact column name from your CSV table
-                const imageUrl = card.imageurl || '';
-
-                // Step 2: Log detailed debugging information
-                // This helps track how the image data is being processed
-                console.log('Raw card data:', {
-                  title: card.title,
-                  description: card.description,
-                  author: card.author,
-                  imageurl: card.imageurl,  // Direct URL from the imageurl column
-                  link: card.link
-                });
-
-                // Step 3: Return the processed card data
-                // Map all fields to match our Card component's props
-                return {
-                  title: card.title,
-                  description: card.description,
-                  author: card.author,
-                  imageUrl: imageUrl,  // Using the URL from imageurl column
-                  link: card.link
-                };
-              });
-              
-              // Step 4: Log the final processed data for verification
-              console.log('Processed Card Data:', mappedCards);
-
-              // Step 5: Update the component's state with the processed cards
+              const mappedCards = cardData.map(card => ({
+                title: card.title,
+                description: card.description,
+                author: card.author,
+                imageUrl: card.imageurl || '',
+                link: card.link
+              }));
               setCards(mappedCards);
             } catch (error) {
-              console.error('Error details:', {
-                message: error.message,
-                response: error.response?.data,
-                status: error.response?.status,
-                url: error.config?.url,
-                headers: error.config?.headers
-              });
-              if (error.response?.status === 404) {
-                setError('Unable to connect to the database. Please verify the table ID and view ID.');
-              } else if (error.response?.status === 401 || error.response?.status === 403) {
-                setError('Authentication failed. Please verify your API token.');
-              } else {
-                setError(`Failed to load cards: ${error.message}. Please check the console for more details.`);
-              }
+              console.error('Error details:', error);
+              setError(
+                error.response?.status === 404
+                  ? 'Unable to connect to the database. Please verify the table ID and view ID.'
+                  : error.response?.status === 401 || error.response?.status === 403
+                  ? 'Authentication failed. Please verify your API token.'
+                  : `Failed to load cards: ${error.message}`
+              );
             } finally {
               setLoading(false);
             }
@@ -241,18 +295,23 @@
         }, []);
 
         // Function to scroll left
-        const scrollLeft = () => {
+        const handleScrollLeft = () => {
           scrollRef.current.scrollBy({ left: -320, behavior: "smooth" });
         };
 
         // Function to scroll right
-        const scrollRight = () => {
+        const handleScrollRight = () => {
           scrollRef.current.scrollBy({ left: 320, behavior: "smooth" });
         };
 
         if (loading) {
           return (
-            <div style={{ textAlign: 'center', padding: '20px' }}>
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '20px',
+              fontSize: '18px',
+              color: '#666' 
+            }}>
               Loading cards...
             </div>
           );
@@ -260,7 +319,15 @@
 
         if (error) {
           return (
-            <div style={{ textAlign: 'center', padding: '20px', color: 'red' }}>
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '20px', 
+              color: '#ff4444',
+              fontSize: '16px',
+              backgroundColor: '#fff5f5',
+              borderRadius: '8px',
+              margin: '20px'
+            }}>
               {error}
             </div>
           );
@@ -268,7 +335,12 @@
 
         if (!cards.length) {
           return (
-            <div style={{ textAlign: 'center', padding: '20px' }}>
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '20px',
+              fontSize: '18px',
+              color: '#666'
+            }}>
               No cards available.
             </div>
           );
@@ -280,41 +352,55 @@
             width: "100%",
             maxWidth: "100%",
             margin: "0 auto",
-            overflow: "hidden"
+            overflow: "hidden",
+            padding: "20px 0"
           }}>
             {/* Left Navigation Button */}
             <button 
-              onClick={scrollLeft} 
+              onClick={handleScrollLeft}
+              className="nav-button"
               style={{
-                position: "absolute", 
-                left: "0", 
-                top: "50%", 
+                position: "absolute",
+                left: "10px",
+                top: "50%",
                 transform: "translateY(-50%)",
-                background: "rgba(0, 0, 0, 0.5)",
+                background: "rgba(0, 0, 0, 0.6)",
                 color: "white",
                 border: "none",
-                padding: "15px",
+                padding: "20px 15px",
                 cursor: "pointer",
                 zIndex: 2,
-                borderRadius: "8px"
+                borderRadius: "12px",
+                fontSize: "20px",
+                transition: "background 0.3s",
+                outline: "none"
               }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(0, 0, 0, 0.8)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "rgba(0, 0, 0, 0.6)"}
             >‹</button>
 
             {/* Scrollable Container */}
             <div 
               ref={scrollRef}
+              className="card-container hide-scrollbar"
               style={{
                 display: "flex",
-                gap: "5px",
+                gap: "20px",
                 overflowX: "auto",
                 padding: "20px",
                 scrollSnapType: "x mandatory",
-                scrollbarWidth: "none",
-                msOverflowStyle: "none",
-                background: "white",
+                scrollBehavior: "smooth",
+                WebkitOverflowScrolling: "touch",
+                background: "white"
               }}
+              onMouseDown={handleMouseDown}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              onMouseMove={handleMouseMove}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleMouseUp}
+              onTouchMove={handleTouchMove}
             >
-              {/* Map through cards from NocoDB */}
               {cards.map((card, index) => (
                 <Card 
                   key={index}
@@ -329,20 +415,26 @@
 
             {/* Right Navigation Button */}
             <button 
-              onClick={scrollRight} 
+              onClick={handleScrollRight}
+              className="nav-button"
               style={{
-                position: "absolute", 
-                right: "0", 
-                top: "50%", 
+                position: "absolute",
+                right: "10px",
+                top: "50%",
                 transform: "translateY(-50%)",
-                background: "rgba(0, 0, 0, 0.5)",
+                background: "rgba(0, 0, 0, 0.6)",
                 color: "white",
                 border: "none",
-                padding: "15px",
+                padding: "20px 15px",
                 cursor: "pointer",
                 zIndex: 2,
-                borderRadius: "8px"
+                borderRadius: "12px",
+                fontSize: "20px",
+                transition: "background 0.3s",
+                outline: "none"
               }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(0, 0, 0, 0.8)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "rgba(0, 0, 0, 0.6)"}
             >›</button>
           </div>
         );
