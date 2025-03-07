@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Card Slider with NocoDB</title>
+  </head>
+  <body>
+    <div id="card"></div>
+
+    <!-- Load React, ReactDOM, Babel and Axios -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <script type="text/babel">
+      /**
+       * Card Component
+       * Displays an image, title, description, and author details.
+       * Clicking the card opens the associated link in a new tab.
+       */
+      function Card({ title, description, imageUrl, author, link }) {
+        const [imageLoaded, setImageLoaded] = React.useState(false);
+        const [imageError, setImageError] = React.useState(false);
+
+        // Function to handle image error
+        const handleImageError = (e) => {
+          console.error('Image failed to load:', {
+            providedUrl: imageUrl,
+            elementSrc: e.target.src,
+            error: e.error
+          });
+          setImageError(true);
+          setImageLoaded(true);
+          e.target.src = 'https://via.placeholder.com/230x230?text=No+Image';
+        };
+
+        // Function to handle image load
+        const handleImageLoad = () => {
+          console.log('Image loaded successfully:', {
+            providedUrl: imageUrl,
+            finalSrc: imageUrl
+          });
+          setImageLoaded(true);
+        };
+
+        // Log the image URL when component mounts
+        React.useEffect(() => {
+          console.log('Card mounted with image URL:', imageUrl);
+        }, [imageUrl]);
+
+        return (
+          <div 
+            className="card"
+            onClick={() => link ? window.open(link, "_blank") : null}
+            style={{
+              border: "2px solid #ddd",
+              borderRadius: "10px",
+              padding: "15px",
+              minWidth: "230px",
+              height: "400px",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+              textAlign: "center",
+              fontFamily: "Arial, sans-serif",
+              background: "#fff",
+              scrollSnapAlign: "start",
+              cursor: link ? "pointer" : "default",
+              position: "relative",
+              overflow: "hidden"
+            }}>
+            <div style={{ 
+              position: "relative", 
+              width: "230px", 
+              height: "230px",
+              background: "#f0f0f0",
+              borderRadius: "5px",
+              overflow: "hidden"
+            }}>
+              {!imageLoaded && <div className="skeleton" style={{ width: "100%", height: "100%" }} />}
+              {!imageError && (
+                <img 
+                  src={imageUrl || 'https://via.placeholder.com/230x230?text=No+Image'} 
+                  alt={title || 'Card image'} 
+                  onLoad={handleImageLoad}
+                  onError={handleImageError}
+                  style={{ 
+                    width: "100%", 
+                    height: "100%", 
+                    objectFit: "cover",
+                    opacity: imageLoaded ? 1 : 0,
+                    transition: "opacity 0.3s ease"
+                  }} 
+                />
+              )}
+              {imageError && (
+                <div style={{
+                  width: "100%",
+                  height: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "#f0f0f0",
+                  color: "#666",
+                  fontSize: "14px",
+                  padding: "20px",
+                  textAlign: "center"
+                }}>
+                  Image not available
+                </div>
+              )}
+            </div>
+            <h3 style={{ 
+              margin: "15px 0", 
+              fontSize: "18px",
+              lineHeight: "1.2",
+              height: "44px",
+              overflow: "hidden",
+              display: "-webkit-box",
+              WebkitLineClamp: "2",
+              WebkitBoxOrient: "vertical"
+            }}>
+              {title || 'Untitled'}
+            </h3>
+            <p style={{ 
+              margin: "10px 0",
+              fontSize: "14px",
+              lineHeight: "1.4",
+              height: "60px",
+              overflow: "hidden",
+              display: "-webkit-box",
+              WebkitLineClamp: "3",
+              WebkitBoxOrient: "vertical",
+              color: "#666"
+            }}>
+              {description || 'No description available'}
+            </p>
+            <p style={{ 
+              fontStyle: "italic", 
+              color: "#888", 
+              fontSize: "12px",
+              margin: "10px 0 0 0",
+              position: "absolute",
+              bottom: "15px",
+              left: "0",
+              right: "0",
+              padding: "0 15px"
+            }}>
+              By {author || 'Unknown'}
+            </p>
+          </div>
+        );
+      }
+
+      /**
+       * CardSlider Component
+       * Provides a horizontally scrollable list of cards.
+       * Includes left and right navigation buttons and fetches data from NocoDB.
+       */
+      function CardSlider() {
+        const [cards, setCards] = React.useState([]);
+        const [loading, setLoading] = React.useState(true);
+        const [error, setError] = React.useState(null);
+        const scrollRef = React.useRef(null);
+
+        React.useEffect(() => {
+          // Fetch data from NocoDB public API
+          const fetchCards = async () => {
+            try {
+              setLoading(true);
+              setError(null);
+              const response = await axios.get(
+                'https://app.nocodb.com/api/v2/tables/msvdzpdvnlr06r0/records',
+                {
+                  headers: {
+                    // TODO: Replace with your NocoDB API token
+                    'xc-token': 'YOUR_API_TOKEN'
+                  },
+                  params: {
+                    offset: 0,
+                    limit: 25,
+                    viewId: 'vwlr2utkuotlfa2f'
+                  }
+                }
+              );
+              console.log('API Response:', response.data); // Debug log
+              // Get the raw data from NocoDB API response
+              const cardData = response.data?.list || response.data || [];
+              
+              // Transform each card's data to match our component structure
+              const mappedCards = cardData.map(card => {
+                // Step 1: Get the image URL directly from the imageurl column
+                // Using the exact column name from your CSV table
+                const imageUrl = card.imageurl || '';
+
+                // Step 2: Log detailed debugging information
+                // This helps track how the image data is being processed
+                console.log('Raw card data:', {
+                  title: card.title,
+                  description: card.description,
+                  author: card.author,
+                  imageurl: card.imageurl,  // Direct URL from the imageurl column
+                  link: card.link
+                });
+
+                // Step 3: Return the processed card data
+                // Map all fields to match our Card component's props
+                return {
+                  title: card.title,
+                  description: card.description,
+                  author: card.author,
+                  imageUrl: imageUrl,  // Using the URL from imageurl column
+                  link: card.link
+                };
+              });
+              
+              // Step 4: Log the final processed data for verification
+              console.log('Processed Card Data:', mappedCards);
+
+              // Step 5: Update the component's state with the processed cards
+              setCards(mappedCards);
+            } catch (error) {
+              console.error('Error details:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status,
+                url: error.config?.url,
+                headers: error.config?.headers
+              });
+              if (error.response?.status === 404) {
+                setError('Unable to connect to the database. Please verify the table ID and view ID.');
+              } else if (error.response?.status === 401 || error.response?.status === 403) {
+                setError('Authentication failed. Please verify your API token.');
+              } else {
+                setError(`Failed to load cards: ${error.message}. Please check the console for more details.`);
+              }
+            } finally {
+              setLoading(false);
+            }
+          };
+
+          fetchCards();
+        }, []);
+
+        // Function to scroll left
+        const scrollLeft = () => {
+          scrollRef.current.scrollBy({ left: -320, behavior: "smooth" });
+        };
+
+        // Function to scroll right
+        const scrollRight = () => {
+          scrollRef.current.scrollBy({ left: 320, behavior: "smooth" });
+        };
+
+        if (loading) {
+          return (
+            <div style={{ textAlign: 'center', padding: '20px' }}>
+              Loading cards...
+            </div>
+          );
+        }
+
+        if (error) {
+          return (
+            <div style={{ textAlign: 'center', padding: '20px', color: 'red' }}>
+              {error}
+            </div>
+          );
+        }
+
+        if (!cards.length) {
+          return (
+            <div style={{ textAlign: 'center', padding: '20px' }}>
+              No cards available.
+            </div>
+          );
+        }
+
+        return (
+          <div style={{
+            position: "relative",
+            width: "100%",
+            maxWidth: "100%",
+            margin: "0 auto",
+            overflow: "hidden"
+          }}>
+            {/* Left Navigation Button */}
+            <button 
+              onClick={scrollLeft} 
+              style={{
+                position: "absolute", 
+                left: "0", 
+                top: "50%", 
+                transform: "translateY(-50%)",
+                background: "rgba(0, 0, 0, 0.5)",
+                color: "white",
+                border: "none",
+                padding: "15px",
+                cursor: "pointer",
+                zIndex: 2,
+                borderRadius: "8px"
+              }}
+            >‹</button>
+
+            {/* Scrollable Container */}
+            <div 
+              ref={scrollRef}
+              style={{
+                display: "flex",
+                gap: "5px",
+                overflowX: "auto",
+                padding: "20px",
+                scrollSnapType: "x mandatory",
+                scrollbarWidth: "none",
+                msOverflowStyle: "none",
+                background: "white",
+              }}
+            >
+              {/* Map through cards from NocoDB */}
+              {cards.map((card, index) => (
+                <Card 
+                  key={index}
+                  title={card.title}
+                  description={card.description}
+                  author={card.author}
+                  imageUrl={card.imageUrl}
+                  link={card.link}
+                />
+              ))}
+            </div>
+
+            {/* Right Navigation Button */}
+            <button 
+              onClick={scrollRight} 
+              style={{
+                position: "absolute", 
+                right: "0", 
+                top: "50%", 
+                transform: "translateY(-50%)",
+                background: "rgba(0, 0, 0, 0.5)",
+                color: "white",
+                border: "none",
+                padding: "15px",
+                cursor: "pointer",
+                zIndex: 2,
+                borderRadius: "8px"
+              }}
+            >›</button>
+          </div>
+        );
+      }
+
+      // Render the CardSlider component inside the "card" div
+      ReactDOM.createRoot(document.getElementById("card")).render(<CardSlider />);
+    </script>
+  </body>
+</html> 

@@ -1,0 +1,12 @@
+{
+  "name": "react-nocodbslider",
+  "version": "1.0.0",
+  "description": "React Card Slider with NocoDB",
+  "scripts": {
+    "dev": "http-server -c-1 -o /index.html",
+    "start": "http-server -c-1 -o /index.html"
+  },
+  "dependencies": {
+    "http-server": "^14.1.1"
+  }
+} 
