@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Card Slider with NocoDB</title>
+    <title>Card Slider with Notion</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAABILAAASCwAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A">
     <style>
       /* Hide scrollbar but keep functionality */
       .hide-scrollbar {
@@ -44,11 +45,12 @@
   <body>
     <div id="card"></div>
 
-    <!-- Load React, ReactDOM, Babel and Axios -->
+    <!-- Load React, ReactDOM, Babel, Axios and Notion Client -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@notionhq/client@2.2.14/build/index.min.js"></script>
 
     <script type="text/babel">
       /**
@@ -56,14 +58,14 @@
        * Displays an image, title, description, and author details.
        * Clicking the card opens the associated link in a new tab.
        */
-      function Card({ title, description, imageUrl, author, link }) {
+      function Card({ title, description, author, imageurl, link, image }) {
         const [imageLoaded, setImageLoaded] = React.useState(false);
         const [imageError, setImageError] = React.useState(false);
 
         // Function to handle image error
         const handleImageError = (e) => {
           console.error('Image failed to load:', {
-            providedUrl: imageUrl,
+            providedUrl: imageurl || image,
             elementSrc: e.target.src,
             error: e.error
           });
@@ -75,16 +77,14 @@
         // Function to handle image load
         const handleImageLoad = () => {
           console.log('Image loaded successfully:', {
-            providedUrl: imageUrl,
-            finalSrc: imageUrl
+            providedUrl: imageurl || image,
+            finalSrc: imageurl || image
           });
           setImageLoaded(true);
         };
 
-        // Log the image URL when component mounts
-        React.useEffect(() => {
-          console.log('Card mounted with image URL:', imageUrl);
-        }, [imageUrl]);
+        // Get the final image URL
+        const finalImageUrl = imageurl || image;
 
         return (
           <div 
@@ -128,9 +128,9 @@
               backgroundColor: "white"
             }}>
               {!imageLoaded && <div className="skeleton" style={{ width: "100%", height: "100%" }} />}
-              {!imageError && (
+              {!imageError && finalImageUrl && (
                 <img 
-                  src={imageUrl || 'https://via.placeholder.com/280x280?text=No+Image'} 
+                  src={finalImageUrl} 
                   alt={title || 'Card image'} 
                   onLoad={handleImageLoad}
                   onError={handleImageError}
@@ -143,7 +143,7 @@
                   }} 
                 />
               )}
-              {imageError && (
+              {(imageError || !finalImageUrl) && (
                 <div style={{
                   width: "100%",
                   height: "100%",
@@ -206,7 +206,7 @@
       /**
        * CardSlider Component
        * Provides a horizontally scrollable list of cards.
-       * Includes left and right navigation buttons and fetches data from NocoDB.
+       * Includes left and right navigation buttons and fetches data from Notion.
        */
       function CardSlider() {
         const [cards, setCards] = React.useState([]);
@@ -216,6 +216,36 @@
         const [isDragging, setIsDragging] = React.useState(false);
         const [startX, setStartX] = React.useState(0);
         const [scrollLeft, setScrollLeft] = React.useState(0);
+
+        // Fetch data from our API
+        const fetchCards = async () => {
+          try {
+            setLoading(true);
+            console.log('Fetching cards...');
+            const response = await fetch('http://localhost:3001/api/cards');
+            
+            if (!response.ok) {
+              throw new Error('Failed to fetch cards');
+            }
+            
+            const data = await response.json();
+            console.log('Fetched cards:', data);
+            setCards(data);
+            setError(null);
+          } catch (err) {
+            console.error('Error fetching data:', err);
+            setError('Failed to load cards. Please try again later.');
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        React.useEffect(() => {
+          fetchCards();
+          // Refresh data every 30 seconds
+          const interval = setInterval(fetchCards, 30000);
+          return () => clearInterval(interval);
+        }, []);
 
         // Touch and mouse event handlers for smooth scrolling
         const handleMouseDown = (e) => {
@@ -249,73 +279,12 @@
           scrollRef.current.scrollLeft = scrollLeft - walk;
         };
 
-        React.useEffect(() => {
-          // Fetch data from NocoDB public API
-          const fetchCards = async () => {
-            try {
-              setLoading(true);
-              setError(null);
-              const response = await axios.get(
-                'https://app.nocodb.com/api/v2/tables/msvdzpdvnlr06r0/records',
-                {
-                  headers: {
-                    'xc-token': 'lYRPLV022asQhcc8_rWP9K8iyA9fuDhSzTidAVF3'
-                  },
-                  params: {
-                    offset: 0,
-                    limit: 25,
-                    viewId: 'vwlr2utkuotlfa2f'
-                  }
-                }
-              );
-              const cardData = response.data?.list || response.data || [];
-              const mappedCards = cardData.map(card => ({
-                title: card.title,
-                description: card.description,
-                author: card.author,
-                imageUrl: card.imageurl || '',
-                link: card.link
-              }));
-              setCards(mappedCards);
-            } catch (error) {
-              console.error('Error details:', error);
-              setError(
-                error.response?.status === 404
-                  ? 'Unable to connect to the database. Please verify the table ID and view ID.'
-                  : error.response?.status === 401 || error.response?.status === 403
-                  ? 'Authentication failed. Please verify your API token.'
-                  : `Failed to load cards: ${error.message}`
-              );
-            } finally {
-              setLoading(false);
-            }
-          };
-
-          fetchCards();
-        }, []);
-
-        // Function to scroll left
-        const handleScrollLeft = () => {
-          scrollRef.current.scrollBy({ left: -320, behavior: "smooth" });
+        // Navigation functions
+        const scroll = (direction) => {
+          const container = scrollRef.current;
+          const scrollAmount = direction === 'left' ? -300 : 300;
+          container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
         };
-
-        // Function to scroll right
-        const handleScrollRight = () => {
-          scrollRef.current.scrollBy({ left: 320, behavior: "smooth" });
-        };
-
-        if (loading) {
-          return (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '20px',
-              fontSize: '18px',
-              color: '#666' 
-            }}>
-              Loading cards...
-            </div>
-          );
-        }
 
         if (error) {
           return (
@@ -323,76 +292,44 @@
               textAlign: 'center', 
               padding: '20px', 
               color: '#ff4444',
-              fontSize: '16px',
-              backgroundColor: '#fff5f5',
-              borderRadius: '8px',
-              margin: '20px'
+              fontFamily: 'Arial, sans-serif' 
             }}>
               {error}
             </div>
           );
         }
 
-        if (!cards.length) {
-          return (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '20px',
-              fontSize: '18px',
-              color: '#666'
-            }}>
-              No cards available.
-            </div>
-          );
-        }
-
         return (
-          <div style={{
-            position: "relative",
-            width: "100%",
-            maxWidth: "100%",
-            margin: "0 auto",
-            overflow: "hidden",
-            padding: "20px 0"
-          }}>
-            {/* Left Navigation Button */}
-            <button 
-              onClick={handleScrollLeft}
+          <div style={{ position: 'relative', padding: '20px 40px' }}>
+            {/* Navigation Buttons */}
+            <button
               className="nav-button"
+              onClick={() => scroll('left')}
               style={{
-                position: "absolute",
-                left: "10px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                background: "rgba(0, 0, 0, 0.6)",
-                color: "white",
-                border: "none",
-                padding: "20px 20px",
-                cursor: "pointer",
-                zIndex: 2,
-                borderRadius: "12px",
-                fontSize: "20px",
-                transition: "background 0.3s",
-                outline: "none"
+                position: 'absolute',
+                left: '0',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                zIndex: 1,
+                background: '#fff',
+                border: '1px solid #ddd',
+                borderRadius: '50%',
+                width: '40px',
+                height: '40px',
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(0, 0, 0, 0.8)"}
-              onMouseLeave={(e) => e.currentTarget.style.background = "rgba(0, 0, 0, 0.6)"}
-            >‹</button>
-
-            {/* Scrollable Container */}
-            <div 
+            >
+              ←
+            </button>
+            
+            {/* Card Container */}
+            <div
               ref={scrollRef}
-              className="card-container hide-scrollbar"
-              style={{
-                display: "flex",
-                gap: "20px",
-                overflowX: "auto",
-                padding: "20px",
-                scrollSnapType: "x mandatory",
-                scrollBehavior: "smooth",
-                WebkitOverflowScrolling: "touch",
-                background: "white"
-              }}
+              className="hide-scrollbar"
               onMouseDown={handleMouseDown}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
@@ -400,48 +337,77 @@
               onTouchStart={handleTouchStart}
               onTouchEnd={handleMouseUp}
               onTouchMove={handleTouchMove}
+              style={{
+                display: 'flex',
+                overflowX: 'auto',
+                gap: '20px',
+                padding: '20px 0',
+                scrollSnapType: 'x mandatory',
+                scrollBehavior: 'smooth',
+                WebkitOverflowScrolling: 'touch'
+              }}
             >
-              {cards.map((card, index) => (
-                <Card 
-                  key={index}
-                  title={card.title}
-                  description={card.description}
-                  author={card.author}
-                  imageUrl={card.imageUrl}
-                  link={card.link}
-                />
-              ))}
+              {loading ? (
+                // Loading skeleton cards
+                Array.from({ length: 3 }).map((_, index) => (
+                  <div
+                    key={`skeleton-${index}`}
+                    className="skeleton"
+                    style={{
+                      minWidth: '280px',
+                      height: '450px',
+                      borderRadius: '15px',
+                      margin: '0 5px'
+                    }}
+                  />
+                ))
+              ) : (
+                // Actual cards
+                cards.map((card, index) => (
+                  <Card
+                    key={index}
+                    title={card.title}
+                    description={card.description}
+                    author={card.author}
+                    imageurl={card.imageurl}
+                    link={card.link}
+                    image={card.image}
+                  />
+                ))
+              )}
             </div>
 
             {/* Right Navigation Button */}
-            <button 
-              onClick={handleScrollRight}
+            <button
               className="nav-button"
+              onClick={() => scroll('right')}
               style={{
-                position: "absolute",
-                right: "10px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                background: "rgba(0, 0, 0, 0.6)",
-                color: "white",
-                border: "none",
-                padding: "20px 20px",
-                cursor: "pointer",
-                zIndex: 2,
-                borderRadius: "12px",
-                fontSize: "20px",
-                transition: "background 0.3s",
-                outline: "none"
+                position: 'absolute',
+                right: '0',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                zIndex: 1,
+                background: '#fff',
+                border: '1px solid #ddd',
+                borderRadius: '50%',
+                width: '40px',
+                height: '40px',
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(0, 0, 0, 0.8)"}
-              onMouseLeave={(e) => e.currentTarget.style.background = "rgba(0, 0, 0, 0.6)"}
-            >›</button>
+            >
+              →
+            </button>
           </div>
         );
       }
 
-      // Render the CardSlider component inside the "card" div
-      ReactDOM.createRoot(document.getElementById("card")).render(<CardSlider />);
+      // Render the app
+      const root = ReactDOM.createRoot(document.getElementById('card'));
+      root.render(<CardSlider />);
     </script>
   </body>
 </html> 

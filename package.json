@@ -1,12 +1,18 @@
 {
-  "name": "react-nocodbslider",
+  "name": "notion-cms",
   "version": "1.0.0",
-  "description": "React Card Slider with NocoDB",
+  "description": "Notion as a Headless CMS",
   "scripts": {
-    "dev": "http-server -c-1 -o /index.html",
-    "start": "http-server -c-1 -o /index.html"
+    "dev": "node src/server.js",
+    "start": "node src/server.js",
+    "build": "mkdir -p dist && cp -r src/* dist/"
   },
   "dependencies": {
-    "http-server": "^14.1.1"
+    "@notionhq/client": "^2.2.16",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.18.2",
+    "node-cache": "^5.1.2",
+    "swr": "^2.3.3"
   }
-} 
+}
